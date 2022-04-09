@@ -4,7 +4,7 @@ from numpy import array
 def voigt_to_3x3(): 
     pass
 
-all_strain_tensors = [
+all_strain_tensors = array([
                       [1, 0, 0, 0, 0, 0], # C_11 0 
                       [0, 1, 0, 0, 0, 0], # C_22 1
                       [0, 0, 1, 0, 0, 0], # C_33 2
@@ -26,7 +26,7 @@ all_strain_tensors = [
                       [0, 0, 0, 2, 2, 0], # C_45 18
                       [0, 0, 0, 2, 0, 2], # C_46 19
                       [0, 0, 0, 0, 2, 2]  # C_56 20
-              ] 
+              ])
 
 # NOTE: Monoclinic might need testing
 #       Triclinic could be reduced to 18
