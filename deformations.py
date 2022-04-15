@@ -41,10 +41,16 @@ class Idk:
 
         self.strain_set = STRAIN_SETS[self.lattice_type]
 
-    def deform(self, n=5, smin=0.0, smax=0.03):
-        self.strains = np.linspace(smin, smax, n)
+    def deform(self, n=5, smin=0.0, smax=0.04, i_rerun=None, strains=None):
+        if strains is None:
+            self.strains = np.linspace(smin, smax, n)
+        else:
+            self.strains = np.array(strains)
 
         for i, eta  in enumerate(self.strain_set):
+            if i_rerun is not None:
+                if i != i_rerun:
+                    continue
             eta = voigt_to_full(eta)
 
             for j, s in enumerate(self.strains):
@@ -65,6 +71,26 @@ class Idk:
         new_cell = np.dot(deformed_atoms.get_cell(), A)
         deformed_atoms.set_cell(new_cell, scale_atoms=True)
         return deformed_atoms
+
+    def rerun(self, i_rerun, n, smin, smax, strains=None):
+        os.system(f"rm -r {i_rerun:03d}/0*")
+        self.deform(n=n, smin=smin, smax=smax, i_rerun=i_rerun, strains=strains)
+
+        deformation_dirs = glob.glob(f'{i_rerun:03d}/0*')
+        deformation_dirs.sort()
+        
+        for d in deformation_dirs:
+            os.chdir(d)
+            atoms = read("POSCAR")
+            atoms.calc = self.calc
+            atoms.get_potential_energy()
+            atoms.write("opt.traj")
+            os.chdir("../..")
+
+        self.read_data()
+        from enstelco.solve import Base
+        self.base = Base.start(self.strains, self.energies, self.lattice_type)
+        self.base.get_properties()
 
 
     def run(self, n=5, smin=0.0, smax=0.04, calc=None):
