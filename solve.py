@@ -89,6 +89,9 @@ class Base:
         ec = elastic_coudert.Elastic(self.elastic_tensor.tolist())
         self.properties = ec.averages()
         self.K, self.G = self.properties[2][0], self.properties[2][2]
+
+    def plot(self, ij):
+        pass
         
 
 ### XXX: Probably should rework this, not a huge need for subclasses
