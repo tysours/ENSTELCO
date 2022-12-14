@@ -7,15 +7,13 @@ from enstelco.strains import STRAIN_SETS
 import elastic_coudert
 
 
-class Base:
+class BaseSolver:
     def __init__(self, strains, energies):
         self.strains = strains
         self.energies = energies
 
-
-    # XXX: WTF DO I NAME THIS?
     @classmethod
-    def start(cls, strains, energies, lattice_type):
+    def start_from_type(cls, strains, energies, lattice_type):
         if lattice_type == 'cubic':
             self = Cubic(strains, energies)
         elif lattice_type == 'hexagonal':
@@ -36,12 +34,10 @@ class Base:
             self = Triclinic(strains, energies)
         return self
 
-
-# TODO: Implement 3rd order elastic consants
+    # TODO: Implement 3rd order elastic consants
     def get_E(self, A2):#, A3):
         E = 1/2 * A2 * self._strains**2 #+ 1/6 * A3 * self._strains**3
         return E
-
 
     def loss(self, x, grad):
         if grad.size > 0:
@@ -52,17 +48,15 @@ class Base:
         mse = np.mean((guess - self._energies) ** 2)
         return mse
 
-
     def fit_energy(self, strains, energies):
         self._strains = strains
         self._energies = energies
         self.opt = nlopt.opt(nlopt.LD_LBFGS, 1)
         self.opt.set_min_objective(self.loss)
         self.opt.set_ftol_rel(1e-6)
-        
+
         A2 = self.opt.optimize([10.0])
         return A2
-
 
     def get_elastic_constants(self):
         A2 = [self.fit_energy(s, e) for s, e in zip(self.strains, self.energies)]
@@ -92,11 +86,9 @@ class Base:
 
     def plot(self, ij):
         pass
-        
 
-### XXX: Probably should rework this, not a huge need for subclasses
-class Cubic(Base):
 
+class Cubic(BaseSolver):
     def get_ec_matrix(self):
         self.order = ['C11', 'C44', 'C12']
         strain_set = STRAIN_SETS['cubic']
@@ -105,7 +97,7 @@ class Cubic(Base):
             [[1, 0, 0, 0, 0, 0],
              [0, 1, 0, 0, 0, 0],
              [0, 0, 1, 0, 0, 0],
-             [0, 0, 0, 0, 0, 0], 
+             [0, 0, 0, 0, 0, 0],
              [0, 0, 0, 0, 0, 0],
              [0, 0, 0, 0, 0, 0]],
             [[0, 0, 0, 0, 0, 0],
@@ -120,14 +112,13 @@ class Cubic(Base):
              [0, 0, 0, 0, 0, 0],
              [0, 0, 0, 0, 0, 0],
              [0, 0, 0, 0, 0, 0]]])
- 
+
         temp = strain_matrix[:, np.newaxis] * self.sym
         ec_matrix = np.sum(temp, axis=(2, 3))
 
         return ec_matrix
 
-class Hexagonal(Base):
-    
+class Hexagonal(BaseSolver):
     def get_ec_matrix(self):
         self.order = ['C11', 'C33', 'C44', 'C12', 'C13']
         strain_set = STRAIN_SETS['hexagonal']
@@ -186,8 +177,7 @@ class Hexagonal(Base):
         self.sym = np.insert(self.sym, i_insert, c66_sym, axis=0)
         self.elastic_constants = {o: ec for o, ec in zip(self.order, elastic_constants)}
 
-class Tetragonal1(Base):
-    
+class Tetragonal1(BaseSolver):
     def get_ec_matrix(self):
         self.order = ['C11', 'C33', 'C44', 'C66', 'C12', 'C13']
         strain_set = STRAIN_SETS['tetragonal1']
@@ -235,8 +225,7 @@ class Tetragonal1(Base):
 
         return ec_matrix
 
-class Tetragonal2(Base):
-    
+class Tetragonal2(BaseSolver):
     def get_ec_matrix(self):
         self.order = ['C11', 'C33', 'C44', 'C66', 'C12', 'C13', 'C16']
         strain_set = STRAIN_SETS['tetragonal2']
@@ -291,8 +280,7 @@ class Tetragonal2(Base):
         return ec_matrix
 
 
-class Trigonal1(Base):
-    
+class Trigonal1(BaseSolver):
     def get_ec_matrix(self):
         self.order = ['C11', 'C33', 'C44', 'C12', 'C13', 'C14']
         strain_set = STRAIN_SETS['trigonal1']
@@ -357,8 +345,7 @@ class Trigonal1(Base):
         self.sym = np.insert(self.sym, i_insert, c66_sym, axis=0)
         self.elastic_constants = {o: ec for o, ec in zip(self.order, elastic_constants)}
 
-class Trigonal2(Base):
-    
+class Trigonal2(BaseSolver):
     def get_ec_matrix(self):
         self.order = ['C11', 'C33', 'C44', 'C12', 'C13', 'C14', 'C15']
         strain_set = STRAIN_SETS['trigonal2']
@@ -429,8 +416,7 @@ class Trigonal2(Base):
         self.sym = np.insert(self.sym, i_insert, c66_sym, axis=0)
         self.elastic_constants = {o: ec for o, ec in zip(self.order, elastic_constants)}
 
-class Orthorhombic(Base):
-    
+class Orthorhombic(BaseSolver):
     def get_ec_matrix(self):
         self.order = ['C11', 'C22', 'C33', 'C44', 'C55', 'C66',
                       'C12', 'C13', 'C23']
@@ -497,8 +483,7 @@ class Orthorhombic(Base):
 
         return ec_matrix
 
-class Monoclinic(Base):
-    
+class Monoclinic(BaseSolver):
     def get_ec_matrix(self):
         self.order = ['C11', 'C22', 'C33', 'C44', 'C55', 'C66',
                       'C12', 'C13', 'C23', 'C15', 'C25', 'C35', 'C46']
@@ -589,8 +574,7 @@ class Monoclinic(Base):
 
         return ec_matrix
 
-class Triclinic(Base):
-    
+class Triclinic(BaseSolver):
     def get_ec_matrix(self):
         self.order = ['C11', 'C22', 'C33', 'C44', 'C55', 'C66',
                       'C12', 'C13', 'C14', 'C15', 'C16', 'C23', 'C24', 'C25',

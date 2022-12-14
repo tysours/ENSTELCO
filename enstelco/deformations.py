@@ -1,18 +1,18 @@
 #!/usr/bin/env python
-from enstelco.strains import STRAIN_SETS
-from enstelco.utils import voigt_to_full, get_lattice_type
-import elastic_coudert
-from ase.io import read
 import numpy as np
 import os
 import glob
+from ase.io import read
+
+from enstelco.strains import STRAIN_SETS
+from enstelco.utils import voigt_to_full, get_lattice_type
 
 crystal_familes = ['cubic', 'hexagonal', 'trigonal1',
                    'trigonal2', 'tetragonal1', 'tetragonal2',
                    'orthorhombic', 'monoclinic', 'triclinic']
 
 
-class Idk:
+class Deformations:
     def __init__(self, atoms, calc=None, lattice_type=None, verbose=False):
         """
 
@@ -35,8 +35,8 @@ class Idk:
             self.lattice_type = get_lattice_type(atoms, spacegroup=lattice_type)
         else:
             if lattice_type.lower() not in crystal_families:
-                raise ValueError(f"Lattice type not recognized, choose from:\n\
-                                   {crystal_families}")
+                raise ValueError(f'Lattice type not recognized, choose from:\n\
+                                   {crystal_families}')
             self.lattice_type = lattice_type.lower()
 
         self.strain_set = STRAIN_SETS[self.lattice_type]
@@ -60,7 +60,7 @@ class Idk:
                 deformed_atoms.write(f"{path}/POSCAR")
 
             np.savetxt(f"{i:03d}/strains", self.strains)
-                 
+
 
     def get_deformation(self, eta, strain):
         if len(eta) == 6:
@@ -76,9 +76,9 @@ class Idk:
         os.system(f"rm -r {i_rerun:03d}/0*")
         self.deform(n=n, smin=smin, smax=smax, i_rerun=i_rerun, strains=strains)
 
-        deformation_dirs = glob.glob(f'{i_rerun:03d}/0*')
+        deformation_dirs = glob.glob(f"{i_rerun:03d}/0*")
         deformation_dirs.sort()
-        
+
         for d in deformation_dirs:
             os.chdir(d)
             atoms = read("POSCAR")
@@ -97,16 +97,16 @@ class Idk:
         self.deform(n=n, smin=smin, smax=smax)
         if calc is None:
             if self.calc is None:
-                print("NO CALCULATOR PRESENT")
-                print("ONLY PERFORMING DEFORMATIONS")
+                print('NO CALCULATOR PRESENT')
+                print('ONLY PERFORMING DEFORMATIONS')
                 return
             calc = self.calc
         deformation_dirs = glob.glob('0*/0*')
         deformation_dirs.sort()
-        
+
         for d in deformation_dirs:
             os.chdir(d)
-            atoms = read("POSCAR")
+            atoms = read('POSCAR')
             atoms.calc = calc
             atoms.get_potential_energy()
             atoms.write("opt.traj")
