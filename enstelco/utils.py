@@ -10,10 +10,20 @@ def get_lattice_type(atoms, spacegroup=None, symprec=0.01):
 
     Parameters
     ----------
-    atoms: ASE Atoms object to find lattice type
-    spacegroup: int (optional), option to manually specify spacegroup
-    symprec: float, spglib symmetry tolerance to find spacegroup
-             higher value for less symmetric structures
+    atoms
+        ASE Atoms object to find lattice type
+
+    spacegroup : int
+        option to manually specify spacegroup
+
+    symprec : float
+        spglib symmetry tolerance to find spacegroup higher value for less
+        symmetric structures
+
+    Returns
+    -------
+    str
+        lattice type of atoms
     """
     families = {
         2: "triclinic",
@@ -49,7 +59,13 @@ def voigt_to_full(V):
 
     Parameters
     ----------
-    V: array-like, 6 element vector in voigt notation
+    V : array-like
+        6 element vector in voigt notation
+
+    Returns
+    -------
+    array
+        3x3 array of stress tensor components
     """
 
 
@@ -72,8 +88,13 @@ def full_to_voigt(A):
 
     Parameters
     ----------
-    A: array-like, 3x3 array to transform into voigt notation vector
+    A : array-like
+        3x3 array to transform into voigt notation vector
 
+    Returns
+    -------
+    array
+        6 element vector in voigt notation
     """
     A = 0.5 * (A + A.T)
     V = [A[0, 0], A[1, 1], A[2, 2], 2*A[1, 2], 2*A[0, 2], 2*A[0, 1]]
