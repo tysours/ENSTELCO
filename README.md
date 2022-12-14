@@ -2,14 +2,14 @@
 
 ![Screenshot](design.png)
 
-## Energy-Strain-Elastic-Constants (ENSTELCO – rebranding desperately needed)
+### Energy-Strain-Elastic-Constants (ENSTELCO – rebranding desperately needed)
 
 ENSTELCO interfaces with the popular [Atomic Simulation Environment (ASE)](https://wiki.fysik.dtu.dk/ase/index.html)
 to provide a simple and versatile platform for calculating second-order elastic constants
 (and ensuing mechanical properties) of materials. It implements the approaches described in
 [this work](https://doi.org/10.1103/PhysRevB.75.094105):
 
-: J. Zhao, J. M. Winey and Y. M. Gupta, Phys. Rev. B, 2007, 75, 094105.
+> J. Zhao, J. M. Winey and Y. M. Gupta, Phys. Rev. B, 2007, 75, 094105.
 
 ### Features
 
