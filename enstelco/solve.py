@@ -3,16 +3,17 @@ import numpy as np
 import nlopt
 from scipy.optimize import approx_fprime
 from ase.units import GPa
+
 from enstelco.strains import STRAIN_SETS
-import elastic_coudert
+from enstelco.elate.elastic import Elastic
 
 
 class BaseSolver:
-    def __init__(self, strains, energies):
+    def __init__(self, strains=None, energies=None):
         self.strains = strains
         self.energies = energies
 
-    @classmethod
+    @classmethod # XXX: deprecated, not particularly useful
     def start_from_type(cls, strains, energies, lattice_type):
         if lattice_type == 'cubic':
             self = Cubic(strains, energies)
@@ -35,8 +36,10 @@ class BaseSolver:
         return self
 
     # TODO: Implement 3rd order elastic consants
-    def get_E(self, A2):#, A3):
-        E = 1/2 * A2 * self._strains**2 #+ 1/6 * A3 * self._strains**3
+    def get_E(self, A2, strains=None):#, A3):
+        if strains is None:
+            strains = self._strains
+        E = 1/2 * A2 * strains**2 #+ 1/6 * A3 * strains**3
         return E
 
     def _loss(self, x, grad):
@@ -59,8 +62,8 @@ class BaseSolver:
         return A2
 
     def get_elastic_constants(self):
-        A2 = [self.fit_energy(s, e) for s, e in zip(self.strains, self.energies)]
-        A2 = np.array(A2) / GPa
+        self._A2 = [self.fit_energy(s, e) for s, e in zip(self.strains, self.energies)]
+        A2 = np.array(self._A2) / GPa
         ec_matrix = self.get_ec_matrix()
 
         elastic_constants = np.linalg.solve(ec_matrix, A2).T[0]
@@ -80,12 +83,9 @@ class BaseSolver:
         if not hasattr(self, 'elastic_tensor'):
             self.get_elastic_tensor()
 
-        ec = elastic_coudert.Elastic(self.elastic_tensor.tolist())
+        ec = Elastic(self.elastic_tensor.tolist())
         self.properties = ec.averages()
         self.K, self.G = self.properties[2][0], self.properties[2][2]
-
-    def plot(self, cij):
-        pass
 
     def get_ec_matrix(self):
         strain_set = STRAIN_SETS[self.lattice_type]
@@ -96,31 +96,10 @@ class BaseSolver:
 
 
 class Cubic(BaseSolver):
-    lattice_type = 'cubic'
-    order = ['C11', 'C44', 'C12']
-    sym = np.array([
-        [[1, 0, 0, 0, 0, 0],
-         [0, 1, 0, 0, 0, 0],
-         [0, 0, 1, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0]],
-        [[0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 1, 0, 0],
-         [0, 0, 0, 0, 1, 0],
-         [0, 0, 0, 0, 0, 1]],
-        [[0, 1, 1, 0, 0, 0],
-         [1, 0, 1, 0, 0, 0],
-         [1, 1, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0]]])
-    def get_ec_matrix(self):
+    def __init__(self, strains=None, energies=None):
+        super().__init__(strains, energies)
+        self.lattice_type = 'cubic'
         self.order = ['C11', 'C44', 'C12']
-        strain_set = STRAIN_SETS['cubic']
-        strain_matrix = strain_set[..., np.newaxis] * strain_set[:, np.newaxis]
         self.sym = np.array([
             [[1, 0, 0, 0, 0, 0],
              [0, 1, 0, 0, 0, 0],
@@ -141,50 +120,12 @@ class Cubic(BaseSolver):
              [0, 0, 0, 0, 0, 0],
              [0, 0, 0, 0, 0, 0]]])
 
-        temp = strain_matrix[:, np.newaxis] * self.sym
-        ec_matrix = np.sum(temp, axis=(2, 3))
-
-        return ec_matrix
 
 class Hexagonal(BaseSolver):
-    lattice_type = 'hexagonal'
-    order = ['C11', 'C33', 'C44', 'C12', 'C13']
-    sym = np.array([
-        [[1, 0, 0, 0, 0, 0],
-         [0, 1, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0]],
-        [[0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 1, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0]],
-        [[0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 1, 0, 0],
-         [0, 0, 0, 0, 1, 0],
-         [0, 0, 0, 0, 0, 0]],
-        [[0, 1, 0, 0, 0, 0],
-         [1, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0]],
-        [[0, 0, 1, 0, 0, 0],
-         [0, 0, 1, 0, 0, 0],
-         [1, 1, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0]],
-        ])
-    def get_ec_matrix(self):
+    def __init__(self, strains=None, energies=None):
+        super().__init__(strains, energies)
+        self.lattice_type = 'hexagonal'
         self.order = ['C11', 'C33', 'C44', 'C12', 'C13']
-        strain_set = STRAIN_SETS['hexagonal']
-        strain_matrix = strain_set[..., np.newaxis] * strain_set[:, np.newaxis]
         self.sym = np.array([
             [[1, 0, 0, 0, 0, 0],
              [0, 1, 0, 0, 0, 0],
@@ -217,14 +158,10 @@ class Hexagonal(BaseSolver):
              [0, 0, 0, 0, 0, 0],
              [0, 0, 0, 0, 0, 0]],
             ])
-        temp = strain_matrix[:, np.newaxis] * self.sym
-        ec_matrix = np.sum(temp, axis=(2, 3))
-
-        return ec_matrix
 
     def get_elastic_constants(self):
-        A2 = [self.fit_energy(s, e) for s, e in zip(self.strains, self.energies)]
-        A2 = np.array(A2) / GPa
+        self._A2 = [self.fit_energy(s, e) for s, e in zip(self.strains, self.energies)]
+        A2 = np.array(self._A2) / GPa
         ec_matrix = self.get_ec_matrix()
 
         elastic_constants = np.linalg.solve(ec_matrix, A2).T[0]
@@ -239,51 +176,12 @@ class Hexagonal(BaseSolver):
         self.sym = np.insert(self.sym, i_insert, c66_sym, axis=0)
         self.elastic_constants = {o: ec for o, ec in zip(self.order, elastic_constants)}
 
+
 class Tetragonal1(BaseSolver):
-    lattice_type = 'tetragonal1'
-    order = ['C11', 'C33', 'C44', 'C66', 'C12', 'C13']
-    sym = np.array([
-        [[1, 0, 0, 0, 0, 0],
-         [0, 1, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0]],
-        [[0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 1, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0]],
-        [[0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 1, 0, 0],
-         [0, 0, 0, 0, 1, 0],
-         [0, 0, 0, 0, 0, 0]],
-        [[0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 1]],
-        [[0, 1, 0, 0, 0, 0],
-         [1, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0]],
-        [[0, 0, 1, 0, 0, 0],
-         [0, 0, 1, 0, 0, 0],
-         [1, 1, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0]],
-        ])
-    def get_ec_matrix(self):
+    def __init__(self, strains=None, energies=None):
+        super().__init__(strains, energies)
+        self.lattice_type = 'tetragonal1'
         self.order = ['C11', 'C33', 'C44', 'C66', 'C12', 'C13']
-        strain_set = STRAIN_SETS['tetragonal1']
-        strain_matrix = strain_set[..., np.newaxis] * strain_set[:, np.newaxis]
         self.sym = np.array([
             [[1, 0, 0, 0, 0, 0],
              [0, 1, 0, 0, 0, 0],
@@ -322,62 +220,13 @@ class Tetragonal1(BaseSolver):
              [0, 0, 0, 0, 0, 0],
              [0, 0, 0, 0, 0, 0]],
             ])
-        temp = strain_matrix[:, np.newaxis] * self.sym
-        ec_matrix = np.sum(temp, axis=(2, 3))
 
-        return ec_matrix
 
 class Tetragonal2(BaseSolver):
-    lattice_type = 'tetragonal2'
-    order = ['C11', 'C33', 'C44', 'C66', 'C12', 'C13', 'C16']
-    sym = np.array([
-        [[1, 0, 0, 0, 0, 0],
-         [0, 1, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0]],
-        [[0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 1, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0]],
-        [[0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 1, 0, 0],
-         [0, 0, 0, 0, 1, 0],
-         [0, 0, 0, 0, 0, 0]],
-        [[0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 1]],
-        [[0, 1, 0, 0, 0, 0],
-         [1, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0]],
-        [[0, 0, 1, 0, 0, 0],
-         [0, 0, 1, 0, 0, 0],
-         [1, 1, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0]],
-        [[0, 0, 0, 0, 0, 1],
-         [0, 0, 0, 0, 0,-1],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [1,-1, 0, 0, 0, 0]],
-        ])
-    def get_ec_matrix(self):
+    def __init__(self, strains=None, energies=None):
+        super().__init__(strains, energies)
+        self.lattice_type = 'tetragonal2'
         self.order = ['C11', 'C33', 'C44', 'C66', 'C12', 'C13', 'C16']
-        strain_set = STRAIN_SETS['tetragonal2']
-        strain_matrix = strain_set[..., np.newaxis] * strain_set[:, np.newaxis]
         self.sym = np.array([
             [[1, 0, 0, 0, 0, 0],
              [0, 1, 0, 0, 0, 0],
@@ -422,57 +271,12 @@ class Tetragonal2(BaseSolver):
              [0, 0, 0, 0, 0, 0],
              [1,-1, 0, 0, 0, 0]],
             ])
-        temp = strain_matrix[:, np.newaxis] * self.sym
-        ec_matrix = np.sum(temp, axis=(2, 3))
-
-        return ec_matrix
-
 
 class Trigonal1(BaseSolver):
-    lattice_type = 'trigonal1'
-    order = ['C11', 'C33', 'C44', 'C12', 'C13', 'C14']
-    sym = np.array([
-        [[1, 0, 0, 0, 0, 0],
-         [0, 1, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0]],
-        [[0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 1, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0]],
-        [[0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 1, 0, 0],
-         [0, 0, 0, 0, 1, 0],
-         [0, 0, 0, 0, 0, 0]],
-        [[0, 1, 0, 0, 0, 0],
-         [1, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0]],
-        [[0, 0, 1, 0, 0, 0],
-         [0, 0, 1, 0, 0, 0],
-         [1, 1, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0]],
-        [[0, 0, 0, 1, 0, 0],
-         [0, 0, 0,-1, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [1,-1, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 1],
-         [0, 0, 0, 0, 1, 0]],
-        ])
-    def get_ec_matrix(self):
+    def __init__(self, strains=None, energies=None):
+        super().__init__(strains, energies)
+        self.lattice_type = 'trigonal1'
         self.order = ['C11', 'C33', 'C44', 'C12', 'C13', 'C14']
-        strain_set = STRAIN_SETS['trigonal1']
-        strain_matrix = strain_set[..., np.newaxis] * strain_set[:, np.newaxis]
         self.sym = np.array([
             [[1, 0, 0, 0, 0, 0],
              [0, 1, 0, 0, 0, 0],
@@ -511,14 +315,10 @@ class Trigonal1(BaseSolver):
              [0, 0, 0, 0, 0, 1],
              [0, 0, 0, 0, 1, 0]],
             ])
-        temp = strain_matrix[:, np.newaxis] * self.sym
-        ec_matrix = np.sum(temp, axis=(2, 3))
-
-        return ec_matrix
 
     def get_elastic_constants(self):
-        A2 = [self.fit_energy(s, e) for s, e in zip(self.strains, self.energies)]
-        A2 = np.array(A2) / GPa
+        self._A2 = [self.fit_energy(s, e) for s, e in zip(self.strains, self.energies)]
+        A2 = np.array(self._A2) / GPa
         ec_matrix = self.get_ec_matrix()
 
         elastic_constants = np.linalg.solve(ec_matrix, A2).T[0]
@@ -533,58 +333,13 @@ class Trigonal1(BaseSolver):
         self.sym = np.insert(self.sym, i_insert, c66_sym, axis=0)
         self.elastic_constants = {o: ec for o, ec in zip(self.order, elastic_constants)}
 
+
 class Trigonal2(BaseSolver):
-    lattice_type = 'trigonal2'
-    order = ['C11', 'C33', 'C44', 'C12', 'C13', 'C14', 'C15']
-    sym = np.array([
-        [[1, 0, 0, 0, 0, 0],
-         [0, 1, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0]],
-        [[0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 1, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0]],
-        [[0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 1, 0, 0],
-         [0, 0, 0, 0, 1, 0],
-         [0, 0, 0, 0, 0, 0]],
-        [[0, 1, 0, 0, 0, 0],
-         [1, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0]],
-        [[0, 0, 1, 0, 0, 0],
-         [0, 0, 1, 0, 0, 0],
-         [1, 1, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0]],
-        [[0, 0, 0, 1, 0, 0],
-         [0, 0, 0,-1, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [1,-1, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 1],
-         [0, 0, 0, 0, 1, 0]],
-        [[0, 0, 0, 0, 1, 0],
-         [0, 0, 0, 0,-1, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0,-1],
-         [1,-1, 0, 0, 0, 0],
-         [0, 0, 0,-1, 0, 0]],
-        ])
-    def get_ec_matrix(self):
-        self.order = ['C11', 'C33', 'C44', 'C12', 'C13', 'C14', 'C15']
-        strain_set = STRAIN_SETS['trigonal2']
-        strain_matrix = strain_set[..., np.newaxis] * strain_set[:, np.newaxis]
-        self.sym = np.array([
+    def __init__(self, strains=None, energies=None):
+        super().__init__(strains, energies)
+        lattice_type = 'trigonal2'
+        order = ['C11', 'C33', 'C44', 'C12', 'C13', 'C14', 'C15']
+        sym = np.array([
             [[1, 0, 0, 0, 0, 0],
              [0, 1, 0, 0, 0, 0],
              [0, 0, 0, 0, 0, 0],
@@ -628,14 +383,10 @@ class Trigonal2(BaseSolver):
              [1,-1, 0, 0, 0, 0],
              [0, 0, 0,-1, 0, 0]],
             ])
-        temp = strain_matrix[:, np.newaxis] * self.sym
-        ec_matrix = np.sum(temp, axis=(2, 3))
-
-        return ec_matrix
 
     def get_elastic_constants(self):
-        A2 = [self.fit_energy(s, e) for s, e in zip(self.strains, self.energies)]
-        A2 = np.array(A2) / GPa
+        self._A2 = [self.fit_energy(s, e) for s, e in zip(self.strains, self.energies)]
+        A2 = np.array(self._A2) / GPa
         ec_matrix = self.get_ec_matrix()
 
         elastic_constants = np.linalg.solve(ec_matrix, A2).T[0]
@@ -650,71 +401,13 @@ class Trigonal2(BaseSolver):
         self.sym = np.insert(self.sym, i_insert, c66_sym, axis=0)
         self.elastic_constants = {o: ec for o, ec in zip(self.order, elastic_constants)}
 
+
 class Orthorhombic(BaseSolver):
-    lattice_type = 'orthorhombic'
-    order = ['C11', 'C22', 'C33', 'C44', 'C55', 'C66',
-             'C12', 'C13', 'C23']
-    sym = np.array([
-        [[1, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0]],
-        [[0, 0, 0, 0, 0, 0],
-         [0, 1, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0]],
-        [[0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 1, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0]],
-        [[0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 1, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0]],
-        [[0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 1, 0],
-         [0, 0, 0, 0, 0, 0]],
-        [[0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 1]],
-        [[0, 1, 0, 0, 0, 0],
-         [1, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0]],
-        [[0, 0, 1, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [1, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0]],
-        [[0, 0, 0, 0, 0, 0],
-         [0, 0, 1, 0, 0, 0],
-         [0, 1, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0]],
-        ])
-    def get_ec_matrix(self):
+    def __init__(self, strains=None, energies=None):
+        super().__init__(strains, energies)
+        self.lattice_type = 'orthorhombic'
         self.order = ['C11', 'C22', 'C33', 'C44', 'C55', 'C66',
-                      'C12', 'C13', 'C23']
-        strain_set = STRAIN_SETS['orthorhombic']
-        strain_matrix = strain_set[..., np.newaxis] * strain_set[:, np.newaxis]
+                 'C12', 'C13', 'C23']
         self.sym = np.array([
             [[1, 0, 0, 0, 0, 0],
              [0, 0, 0, 0, 0, 0],
@@ -771,100 +464,14 @@ class Orthorhombic(BaseSolver):
              [0, 0, 0, 0, 0, 0],
              [0, 0, 0, 0, 0, 0]],
             ])
-        temp = strain_matrix[:, np.newaxis] * self.sym
-        ec_matrix = np.sum(temp, axis=(2, 3))
 
-        return ec_matrix
 
 class Monoclinic(BaseSolver):
-    lattice_type = 'monoclinic'
-    order = ['C11', 'C22', 'C33', 'C44', 'C55', 'C66',
-             'C12', 'C13', 'C23', 'C15', 'C25', 'C35', 'C46']
-    sym = np.array([
-        [[1, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0]],
-        [[0, 0, 0, 0, 0, 0],
-         [0, 1, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0]],
-        [[0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 1, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0]],
-        [[0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 1, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0]],
-        [[0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 1, 0],
-         [0, 0, 0, 0, 0, 0]],
-        [[0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 1]],
-        [[0, 1, 0, 0, 0, 0],
-         [1, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0]],
-        [[0, 0, 1, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [1, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0]],
-        [[0, 0, 0, 0, 0, 0],
-         [0, 0, 1, 0, 0, 0],
-         [0, 1, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0]],
-        [[0, 0, 0, 0, 1, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [1, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0]],
-        [[0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 1, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 1, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0]],
-        [[0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 1, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 1, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0]],
-        [[0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 1],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 1, 0, 0]],
-        ])
-    def get_ec_matrix(self):
+    def __init__(self, strains=None, energies=None):
+        super().__init__(strains, energies)
+        self.lattice_type = 'monoclinic'
         self.order = ['C11', 'C22', 'C33', 'C44', 'C55', 'C66',
                       'C12', 'C13', 'C23', 'C15', 'C25', 'C35', 'C46']
-        strain_set = STRAIN_SETS['monoclinic']
-        strain_matrix = strain_set[..., np.newaxis] * strain_set[:, np.newaxis]
         self.sym = np.array([
             [[1, 0, 0, 0, 0, 0],
              [0, 0, 0, 0, 0, 0],
@@ -945,151 +552,15 @@ class Monoclinic(BaseSolver):
              [0, 0, 0, 0, 0, 0],
              [0, 0, 0, 1, 0, 0]],
             ])
-        temp = strain_matrix[:, np.newaxis] * self.sym
-        ec_matrix = np.sum(temp, axis=(2, 3))
 
-        return ec_matrix
 
 class Triclinic(BaseSolver):
-    lattice_type = 'triclinic'
-    order = ['C11', 'C22', 'C33', 'C44', 'C55', 'C66',
-             'C12', 'C13', 'C14', 'C15', 'C16', 'C23', 'C24', 'C25',
-             'C26', 'C34', 'C35', 'C36', 'C45', 'C46', 'C56']
-    sym = np.array([
-        [[1, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0]],
-        [[0, 0, 0, 0, 0, 0],
-         [0, 1, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0]],
-        [[0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 1, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0]],
-        [[0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 1, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0]],
-        [[0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 1, 0],
-         [0, 0, 0, 0, 0, 0]],
-        [[0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 1]],
-        [[0, 1, 0, 0, 0, 0],
-         [1, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0]],
-        [[0, 0, 1, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [1, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0]],
-        [[0, 0, 0, 1, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [1, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0]],
-        [[0, 0, 0, 0, 1, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [1, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0]],
-        [[0, 0, 0, 0, 0, 1],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [1, 0, 0, 0, 0, 0]],
-        [[0, 0, 0, 0, 0, 0],
-         [0, 0, 1, 0, 0, 0],
-         [0, 1, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0]],
-        [[0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 1, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 1, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0]],
-        [[0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 1, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 1, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0]],
-        [[0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 1],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 1, 0, 0, 0, 0]],
-        [[0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 1, 0, 0],
-         [0, 0, 1, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0]],
-        [[0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 1, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 1, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0]],
-        [[0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 1],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 1, 0, 0, 0]],
-        [[0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 1, 0],
-         [0, 0, 0, 1, 0, 0],
-         [0, 0, 0, 0, 0, 0]],
-        [[0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 1],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 1, 0, 0]],
-        [[0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 0, 0, 0, 0, 1],
-         [0, 0, 0, 0, 1, 0]],
-        ])
-
-    def get_ec_matrix(self):
+    def __init__(self, strains=None, energies=None):
+        super().__init__(strains, energies)
+        self.lattice_type = 'triclinic'
         self.order = ['C11', 'C22', 'C33', 'C44', 'C55', 'C66',
                       'C12', 'C13', 'C14', 'C15', 'C16', 'C23', 'C24', 'C25',
                       'C26', 'C34', 'C35', 'C36', 'C45', 'C46', 'C56']
-        strain_set = STRAIN_SETS['triclinic']
-        strain_matrix = strain_set[..., np.newaxis] * strain_set[:, np.newaxis]
         self.sym = np.array([
             [[1, 0, 0, 0, 0, 0],
              [0, 0, 0, 0, 0, 0],
@@ -1218,10 +689,7 @@ class Triclinic(BaseSolver):
              [0, 0, 0, 0, 0, 1],
              [0, 0, 0, 0, 1, 0]],
             ])
-        temp = strain_matrix[:, np.newaxis] * self.sym
-        ec_matrix = np.sum(temp, axis=(2, 3))
 
-        return ec_matrix
 
 Solvers = {
         'cubic': Cubic,
