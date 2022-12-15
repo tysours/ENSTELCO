@@ -4,7 +4,7 @@ from pathlib import Path
 
 version = __version__
 
-//github.com/tysours/enstelco/issuesHERE = Path(__file__).parent
+HERE = Path(__file__).parent
 
 README = (HERE / 'README.md').read_text()
 
