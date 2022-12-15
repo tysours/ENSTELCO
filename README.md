@@ -44,3 +44,9 @@ $ pip install .
 ```
 
 And you're done!
+
+## WARNING
+
+ENSTELCO has not been validated for all lattice types! Please report an issue
+[here](https://github.com/tysours/ENSTELCO/issues) or email me directly
+(tsours@ucdavis.edu) if you find issues.
