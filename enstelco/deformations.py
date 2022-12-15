@@ -13,7 +13,8 @@ crystal_families = ['cubic', 'hexagonal', 'trigonal1',
 
 
 class Deformations:
-    def __init__(self, atoms, calc=None, lattice_type=None, verbose=False):
+    def __init__(self, atoms, calc=None, lattice_type=None, verbose=False,
+            input_file='POSCAR', output_file='opt.traj'):
         """
 
         Parameters
@@ -30,11 +31,19 @@ class Deformations:
 
         verbose : bool
             print various summaries and display progress if True.
+
+        input_file : str
+            name of input file to write for each deformation.
+
+        output_file : str
+            name of output file to write for each deformation calculation.
         """
 
         self.atoms = atoms
         self.calc = calc
         self.verbose = verbose
+        self.input_file = input_file
+        self.output_file = output_file
 
         if lattice_type is None:
             self.lattice_type = get_lattice_type(atoms)
@@ -49,6 +58,7 @@ class Deformations:
         self.strain_set = STRAIN_SETS[self.lattice_type]
 
     def deform(self, n=5, smin=0.0, smax=0.04, i_rerun=None, strains=None):
+
         if strains is None:
             self.strains = np.linspace(smin, smax, n)
         else:
@@ -62,11 +72,11 @@ class Deformations:
 
             for j, s in enumerate(self.strains):
                 deformed_atoms = self.get_deformation(eta, s)
-                path = f"{i:03d}/{j:03d}"
+                path = os.path.join(f'{i:03d}', f'{j:03d}')
                 os.makedirs(path, exist_ok=True)
-                deformed_atoms.write(f"{path}/POSCAR")
+                deformed_atoms.write(os.path.join(path, self.input_file))
 
-            np.savetxt(f"{i:03d}/strains", self.strains)
+            np.savetxt(os.path.join(f'{i:03d}', 'strains'), self.strains)
 
     def get_deformation(self, eta, strain):
         if len(eta) == 6:
@@ -79,25 +89,19 @@ class Deformations:
         return deformed_atoms
 
     def rerun(self, i_rerun, n, smin, smax, strains=None):
-        os.system(f"rm -r {i_rerun:03d}/0*")
+        os.system(f'rm -r {i_rerun:03d}/0*')
         self.deform(n=n, smin=smin, smax=smax, i_rerun=i_rerun, strains=strains)
 
-        deformation_dirs = glob.glob(f"{i_rerun:03d}/0*")
+        deformation_dirs = glob.glob(f'{i_rerun:03d}/0*')
         deformation_dirs.sort()
 
         for d in deformation_dirs:
             os.chdir(d)
-            atoms = read("POSCAR")
+            atoms = read(self.input_file)
             atoms.calc = self.calc
             atoms.get_potential_energy()
-            atoms.write("opt.traj")
-            os.chdir("../..")
-
-        self.read_data()
-        from enstelco.solve import Base
-        self.base = Base.start(self.strains, self.energies, self.lattice_type)
-        self.base.get_properties()
-
+            atoms.write(self.output_file)
+            os.chdir('../..')
 
     def run(self, n=5, smin=0.0, smax=0.04, calc=None):
         self.deform(n=n, smin=smin, smax=smax)
@@ -107,15 +111,14 @@ class Deformations:
                 print('ONLY PERFORMING DEFORMATIONS')
                 return
             calc = self.calc
-        deformation_dirs = glob.glob('0*/0*')
-        deformation_dirs.sort()
+        deformation_dirs = sorted(glob.glob('0*/0*'))
 
         for d in deformation_dirs:
             os.chdir(d)
-            atoms = read('POSCAR')
+            atoms = read(self.input_file)
             atoms.calc = calc
             atoms.get_potential_energy()
-            atoms.write("opt.traj")
+            atoms.write(self.output_file)
             os.chdir('../..')
 
 
