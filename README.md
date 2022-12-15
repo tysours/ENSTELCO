@@ -20,3 +20,27 @@ to provide a simple and versatile platform for calculating second-order elastic 
 * Plot energy-strain curves to assess quality of elastic constant fits
 * Compatable with any ASE calculator!
 * Simple CLI for performing deformations, evaluating stress tensor / mechanical properties, and plotting energy-strain behavior
+
+
+## Installation
+
+1. Clone the repository wherever you'd like on your system.
+
+```console
+$ cd /wherever/you/want
+$ clone https://github.com/tysours/ENSTELCO.git
+```
+
+2. Change to the ENSTELCO directory.
+
+```console
+$ cd ENSTELCO
+```
+
+3. Install using pip
+
+```console
+$ pip install .
+```
+
+And you're done!
