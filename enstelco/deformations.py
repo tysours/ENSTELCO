@@ -7,9 +7,9 @@ from ase.io import read
 from enstelco.strains import STRAIN_SETS
 from enstelco.utils import voigt_to_full, get_lattice_type
 
-crystal_familes = ['cubic', 'hexagonal', 'trigonal1',
-                   'trigonal2', 'tetragonal1', 'tetragonal2',
-                   'orthorhombic', 'monoclinic', 'triclinic']
+crystal_families = ['cubic', 'hexagonal', 'trigonal1',
+                    'trigonal2', 'tetragonal1', 'tetragonal2',
+                    'orthorhombic', 'monoclinic', 'triclinic']
 
 
 class Deformations:
@@ -17,12 +17,19 @@ class Deformations:
         """
 
         Parameters
-        ==========
-        atoms:          relaxed ASE Atoms object to deform
-        calc:           ASE calculator object to use for energy calculations
-        lattice_type:   str/int, manually specify lattice_type either as
-                        str (see crystal_families) or int (spacegroup number)
-        verbose:        bool, print various summaries and display progress
+        ----------
+        atoms
+            relaxed ASE Atoms object to deform.
+
+        calc
+            ASE calculator object to use for energy calculations.
+
+        lattice_type : (str or int)
+            manually specify lattice_type either as str (see crystal_families)
+            or int (spacegroup number).
+
+        verbose : bool
+            print various summaries and display progress if True.
         """
 
         self.atoms = atoms
@@ -60,7 +67,6 @@ class Deformations:
                 deformed_atoms.write(f"{path}/POSCAR")
 
             np.savetxt(f"{i:03d}/strains", self.strains)
-
 
     def get_deformation(self, eta, strain):
         if len(eta) == 6:
@@ -112,32 +118,6 @@ class Deformations:
             atoms.write("opt.traj")
             os.chdir('../..')
 
-        self.read_data()
-        from enstelco.solve import Base
-        self.base = Base.start(self.strains, self.energies, self.lattice_type)
-        self.base.get_properties()
-
-
-    def read_data(self):
-        n_sets = len(self.strain_set)
-        strains = [np.loadtxt(f'{i:03d}/strains') for i in range(n_sets)]
-        n_strains = len(strains[0])
-        energies = [[read(f'{i:03d}/{j:03d}/opt.traj').get_potential_energy() for j in range(n_strains)] for i in range(n_sets)]
-        ref_e = self.atoms.get_potential_energy()
-        ref_V = self.atoms.get_volume()
-        self.energies = (np.array(energies) - ref_e) / ref_V
-        self.strains = np.array(strains)
-
-
-    def thing(self):
-        if not hasattr(self, 'energies'):
-            self.read_data()
-
-        from enstelco.solve import Base
-        self.base = Base.start(self.strains, self.energies, self.lattice_type)
-        self.base.get_properties()
-
-
 
 if __name__ == '__main__':
     from ase.io import read
@@ -145,5 +125,5 @@ if __name__ == '__main__':
     atoms = read('opt.traj')
     graph = '/home/sours/data/univ_ml/datasets/00_zeolites/tuning/all/final/64/graph.pb'
     calc = DeepMD(graph, minimize=True)
-    idk = Idk(atoms, calc=calc)
-    idk.thing()
+    idk = Deformations(atoms, calc=calc)
+    idk.process()
