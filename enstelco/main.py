@@ -33,9 +33,12 @@ def dynamic_solver(cls):
 
 @dynamic_solver
 class ENSTELCO(Deformations):
-    def __init__(self, atoms, calc=None, lattice_type=None, verbose=False):
+    def __init__(self, atoms, calc=None, lattice_type=None, verbose=False,
+                 input_file='POSCAR', output_file='opt.traj'):
+
         Deformations.__init__(
-            self, atoms, calc=calc, lattice_type=lattice_type, verbose=verbose
+            self, atoms, calc=calc, lattice_type=lattice_type, verbose=verbose,
+            input_file=input_file, output_file=output_file,
         )
 
     def read(self, opt_file='opt.traj'):
@@ -101,7 +104,6 @@ class ENSTELCO(Deformations):
 
         plt.tight_layout()
         plt.show()
-
 
     def plot_cij(self, ij, color=None, ax=None):
         if ax is None:
