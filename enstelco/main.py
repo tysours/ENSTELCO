@@ -13,7 +13,6 @@ from enstelco.utils import get_lattice_type, colors
 #      (I should really rework solve.py to avoid this)
 def dynamic_solver(cls):
     def make_instance(atoms, **kwargs):
-        print(atoms, kwargs)
         if kwargs.get('lattice_type'):
             lattice_type = kwargs.get('lattice_type')
         else:
@@ -66,9 +65,7 @@ class ENSTELCO(Deformations):
         if cij is all:
             cij = self.order
             if self.lattice_type in ['hexagonal', 'trigonal1', 'trigonal2']:
-                print(cij)
                 cij = [c for c in cij if c != 'C66'] # determined from symmetry
-                print(cij)
         self._cij = cij
 
         n_panels = int(np.ceil(len(cij) / n_max))
@@ -81,7 +78,6 @@ class ENSTELCO(Deformations):
             fig, axs = plt.subplots(n_rows, n_cols, figsize=(width, height))
         if n_cols == n_rows == 1:
             axs = np.array([axs])
-            print(axs)
         if axs.ndim == 1:
             axs = [axs]
         k = 0

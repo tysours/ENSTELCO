@@ -39,9 +39,7 @@ def get_lattice_type(atoms, spacegroup=None, symprec=0.01):
 
     if spacegroup is None:
         cell = (atoms.cell.array, atoms.get_scaled_positions(), atoms.numbers)
-        print(cell)
         s = spglib.get_spacegroup(cell, symprec=symprec)  # returns 'text (spacegroup)'
-        print(s)
         spacegroup = int(s[s.find("(") + 1 : s.find(")")])
 
     for k, v in families.items():
