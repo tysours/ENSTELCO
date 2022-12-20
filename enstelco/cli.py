@@ -1,5 +1,12 @@
+import os
 import argparse
 from textwrap import dedent
+from ase.io import read
+
+from rich.console import Console
+from rich.text import Text
+from rich.tree import Tree
+from rich.table import Table
 
 from enstelco import __version__, ENSTELCO
 
@@ -45,13 +52,28 @@ class DeformCLI(Base):
                 help='Specific lattice type to force (automatically determined by'\
                         ' default). Can be spacegroup number of choose from '\
                         'enstelco.deformations.crystal_families')
+        self.parser.add_argument('-s', '--silent', action='store_true',
+                help='Suppress cool console output - not recommended :)')
 
     def main(self, args):
-        from ase.io import read
         atoms = read(args.structure)
         enstelco = ENSTELCO(atoms, lattice_type=args.lattice_type,
                             input_file=args.input_file)
         enstelco.deform(n=args.n, smin=args.lo, smax=args.hi)
+        if not args.silent:
+            self.make_tree(enstelco)
+
+    def make_tree(self, enstelco):
+        console = Console()
+        text = Text(f'Writing deformations for {enstelco.lattice_type} lattice\n', 'bold')
+        console.print(text)
+
+        tree = Tree(os.getcwd())
+        from rich.panel import Panel
+        for d in enstelco._dirs:
+            path = Text(os.path.join(d, enstelco.input_file))#, 'bold')
+            tree.add(Text('📄 ') + path)
+        console.print(Panel(tree, title="Deformed structures", expand=False))
 
 
 class ProcessCLI(Base):
@@ -61,10 +83,26 @@ class ProcessCLI(Base):
     """
     help_info = 'Calculate elastic constants + mechanical properties'
     def add_args(self):
-        pass
+        self.parser.add_argument('structure', type=str,
+            help='Initial undeformed structure used in calculations to initialize'\
+                   ' ENSTELCO (any ASE-readable format)')
+        self.parser.add_argument('-b', '--boring', action='store_true',
+                help='Produce simple output for easier post-process processing')
+        self.parser.add_argument('-w', '--write', metavar="file_name", default=None,
+                help='Write output to file instead of displaying to console')
+        self.parser.add_argument('-l', '--lattice-type', type=str, default=None,
+                help='Specific lattice type to force (only use if also specified'\
+                        'for deformations)')
+        self.parser.add_argument('-o', '--output_file', type=str, default='POSCAR',
+                help='Name (and ext) of ouput file that was written for each'\
+                        ' deformation optimization')
 
     def main(self, args):
-        raise NotImplementedError('Coming soon...')
+        atoms = read(args.structure)
+        enstelco = ENSTELCO(atoms, lattice_type=args.lattice_type,
+                            output_file=args.output_file)
+        enstelco.process()
+        enstelco.summarize(boring=args.boring, file_name=args.write)
 
 
 class PlotCLI(Base):
