@@ -85,7 +85,12 @@ class BaseSolver:
 
         ec = Elastic(self.elastic_tensor.tolist())
         self.properties = ec.averages()
-        self.K, self.G = self.properties[2][0], self.properties[2][2]
+
+        self.K_V, self.E_V, self.G_V, self.v_V = self.properties[0]
+        self.K_R, self.E_R, self.G_R, self.v_R = self.properties[1]
+        self.K_VRH, self.E_VRH, self.G_VRH, self.v_VRH = self.properties[2]
+
+        self.K, self.G = self.K_VRH, self.G_VRH # most commonly used
 
     def get_ec_matrix(self):
         strain_set = STRAIN_SETS[self.lattice_type]
