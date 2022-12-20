@@ -11,6 +11,7 @@ from rich.table import Table
 from enstelco.deformations import Deformations
 from enstelco.solve import Solvers
 from enstelco.utils import get_lattice_type, colors
+from enstelco.strains import STRAIN_SETS
 
 
 # XXX: Adds dynamic inheritance based on lattice type
@@ -152,14 +153,10 @@ class ENSTELCO(Deformations):
                                  subtitle=subtitle, expand=False)
         return properties_panel
 
-    def plot(self, cij=all, n_max=4, axs=None):
-        if cij is all:
-            cij = self.order
-            if self.lattice_type in ['hexagonal', 'trigonal1', 'trigonal2']:
-                cij = [c for c in cij if c != 'C66'] # determined from symmetry
-        self._cij = cij
+    def plot(self, n_max=4, axs=None, save_file=None):
+        etas = [i for i, _ in enumerate(STRAIN_SETS[self.lattice_type])]
 
-        n_panels = int(np.ceil(len(cij) / n_max))
+        n_panels = int(np.ceil(len(etas) / n_max))
         n_cols = n_panels if n_panels < 4 else 4
         n_rows = int(np.ceil(n_panels / 4))
         width = 0.5 + 3.5 * n_cols
@@ -172,15 +169,14 @@ class ENSTELCO(Deformations):
         if axs.ndim == 1:
             axs = [axs]
         k = 0
-        leg_params = dict(labelcolor='mfc', frameon=0,
-                markerscale=0, handlelength=0.0, fontsize=12)
+        leg_params = dict(labelcolor='linecolor', frameon=0,
+                handlelength=0.5, fontsize=12)
         for a in range(n_rows):
             for b in range(n_cols):
                 for n in range(n_max):
-                    ij = int(cij[k][-2:])
-                    self.plot_cij(ij, color=colors[n], ax=axs[a][b])
+                    self.plot_eta_i(etas[k], color=colors[n], ax=axs[a][b])
                     k += 1
-                    if k == len(cij):
+                    if k == len(etas):
                         break
                 axs[a][b].legend(**leg_params)
                 axs[a][b].tick_params(labelsize=12)
@@ -190,20 +186,21 @@ class ENSTELCO(Deformations):
                     axs[a][b].set_xlabel('Strain (%)', fontsize=14)
 
         plt.tight_layout()
-        plt.show()
+        if save_file:
+            plt.savefig(save_file)
+        else:
+            plt.show()
 
-    def plot_cij(self, ij, color=None, ax=None):
+    def plot_eta_i(self, i, color=None, ax=None):
         if ax is None:
             ax = plt.gca()
 
-        data, fit_data = self._get_plot_data(ij)
-        i, j = str(ij)
-        text = f'C$_{i}$$_{j}$ = {self.elastic_constants[f"C{ij}"]: .1f}'
-        ax.plot(*fit_data, ls='-', lw=2.0, color=color)
-        ax.plot(*data, ls='', marker='o', mew=1, mec='black', color=color, ms=7, label=text)
+        data, fit_data = self._get_plot_data(i)
+        text = f'$\eta$$_{i}$'
+        ax.plot(*fit_data, ls='-', lw=2.0, color=color, label=text)
+        ax.plot(*data, ls='', marker='o', mew=1, mec='black', color=color, ms=7)
 
-    def _get_plot_data(self, ij):
-        i_read = self._cij.index(f'C{ij}')
+    def _get_plot_data(self, i_read):
         A2 = self._A2[i_read]
 
         strains = self.strains[i_read]
