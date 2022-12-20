@@ -1,3 +1,4 @@
 ase
 nlopt
 spglib
+rich
