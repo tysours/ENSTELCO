@@ -88,12 +88,12 @@ class ProcessCLI(Base):
                    ' ENSTELCO (any ASE-readable format)')
         self.parser.add_argument('-b', '--boring', action='store_true',
                 help='Produce simple output for easier post-process processing')
-        self.parser.add_argument('-w', '--write', metavar="file_name", default=None,
+        self.parser.add_argument('-w', '--write', metavar='file_name', default=None,
                 help='Write output to file instead of displaying to console')
         self.parser.add_argument('-l', '--lattice-type', type=str, default=None,
                 help='Specific lattice type to force (only use if also specified'\
                         'for deformations)')
-        self.parser.add_argument('-o', '--output_file', type=str, default='POSCAR',
+        self.parser.add_argument('-o', '--output_file', type=str, default='opt.traj',
                 help='Name (and ext) of ouput file that was written for each'\
                         ' deformation optimization')
 
@@ -108,14 +108,36 @@ class ProcessCLI(Base):
 class PlotCLI(Base):
     """
     Plot energy-strain data from completed calculations with second order fits
-    and annotated elastic constant values.
+    for each strain tensor.
+
+    Examples:
+        $ enstelco plot start.cif
+        $ enstelco plot -n 1 start.cif
+        $ enstelco plot -n 1 -s energy-strain_fits.svg start.cif
     """
     help_info = 'Plot energy-strain data and fits'
     def add_args(self):
-        pass
+        self.parser.add_argument('structure', type=str,
+            help='Initial undeformed structure used in calculations to initialize'\
+                   ' ENSTELCO (any ASE-readable format)')
+        self.parser.add_argument('-s', '--save', metavar='fig_name', default=None,
+                help='Specify file name to save plot instead of displaying')
+        self.parser.add_argument('-l', '--lattice-type', type=str, default=None,
+                help='Specific lattice type to force (only use if also specified'\
+                        'for deformations)')
+        self.parser.add_argument('-n', type=int, default=4,
+                help='Maximum number of elastic constants to plot on each'\
+                        ' figure panel')
+        self.parser.add_argument('-o', '--output_file', type=str, default='opt.traj',
+                help='Name (and ext) of ouput file that was written for each'\
+                        ' deformation optimization')
 
     def main(self, args):
-        raise NotImplementedError('Coming soon...')
+        atoms = read(args.structure)
+        enstelco = ENSTELCO(atoms, lattice_type=args.lattice_type,
+                            output_file=args.output_file)
+        enstelco.process()
+        enstelco.plot(args.n, save_file=args.save)
 
 
 cli_parsers = {
