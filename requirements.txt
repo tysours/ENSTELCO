@@ -1,4 +1,4 @@
 ase
-nlopt
+nlopt==2.7.0
 spglib
 rich
