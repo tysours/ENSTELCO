@@ -28,7 +28,7 @@ setup(name='enstelco',
       python_requires=python_requires,
       install_requires=install_requires,
       package_data=package_data,
-      #entry_points={'console_scripts': ['enstelco=enstelco.cli:main']},
+      entry_points={'console_scripts': ['enstelco=enstelco.cli:main']},
       classifiers=[
           'Development Status :: 3 - Alpha',
           'License :: OSI Approved :: MIT License',
