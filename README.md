@@ -1,6 +1,6 @@
 # ENSTELCO
 
-![Screenshot](design.png)
+![wow!](design.png)
 
 ### Energy-Strain-Elastic-Constants (ENSTELCO – rebranding desperately needed)
 
@@ -21,7 +21,9 @@ to provide a simple and versatile platform for calculating second-order elastic 
 * Compatable with any [ASE calculator](https://wiki.fysik.dtu.dk/ase/ase/calculators/calculators.html)!
 * Simple CLI for performing deformations, evaluating stress tensor / mechanical properties, and plotting energy-strain behavior
 
-![Screenshot](usage.png)
+### General usage of ENSTELCO involves three simple steps:
+
+![Usage](usage.png)
 
 ## Installation
 
