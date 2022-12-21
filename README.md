@@ -18,32 +18,25 @@ to provide a simple and versatile platform for calculating second-order elastic 
 * Solves for 2nd-order elastic constants to generate elastic tensors
 * Calculates mechanical properties (bulk, Young's, and shear moduli) using [ELATE](https://progs.coudert.name/elate)
 * Plot energy-strain curves to assess quality of elastic constant fits
-* Compatable with any ASE calculator!
+* Compatable with any [ASE calculator](https://wiki.fysik.dtu.dk/ase/ase/calculators/calculators.html)!
 * Simple CLI for performing deformations, evaluating stress tensor / mechanical properties, and plotting energy-strain behavior
 
 
 ## Installation
 
-1. Clone the repository wherever you'd like on your system.
+You can easily install ENSTELCO using pip,
 
 ```console
-$ cd /wherever/you/want
-$ clone https://github.com/tysours/ENSTELCO.git
+$ pip install enstelco
 ```
 
-2. Change to the ENSTELCO directory.
+To see if installation was successful, just run this command in the terminal,
 
 ```console
-$ cd ENSTELCO
+$ enstelco --help
 ```
 
-3. Install using pip
-
-```console
-$ pip install .
-```
-
-And you're done!
+If there are no errors returned, success!
 
 ## WARNING
 
