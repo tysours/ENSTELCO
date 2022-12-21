@@ -21,6 +21,7 @@ to provide a simple and versatile platform for calculating second-order elastic 
 * Compatable with any [ASE calculator](https://wiki.fysik.dtu.dk/ase/ase/calculators/calculators.html)!
 * Simple CLI for performing deformations, evaluating stress tensor / mechanical properties, and plotting energy-strain behavior
 
+![Screenshot](usage.png)
 
 ## Installation
 
